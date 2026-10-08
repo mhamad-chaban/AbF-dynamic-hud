@@ -3,7 +3,9 @@
 local AFUtils = require("AFUtils.AFUtils")
 
 local Key = Key
-local isHudVisible = true
+local isHudVisible = nil
+local visibilityMode = "auto"
+local hudUnavailableLogged = false
 
 -- Master list of elements to toggle opacity on
 local TARGET_HUD_PROPERTIES = {
@@ -70,8 +72,11 @@ end
 local function SetGameplayHUDVisibility(visible)
     local mainHUD = GetMainHUDWidget()
     if not mainHUD or not mainHUD:IsValid() then
-        print("[DynamicHUD] Error: Could not locate W_PlayerHUD_Main_C instance.")
-        return
+        if not hudUnavailableLogged then
+            print("[DynamicHUD] Error: Could not locate W_PlayerHUD_Main_C instance.")
+            hudUnavailableLogged = true
+        end
+        return false
     end
 
     local targetOpacity = visible and 1.0 or 0.0
@@ -89,23 +94,25 @@ local function SetGameplayHUDVisibility(visible)
         end
     end
 
+    if successCount == 0 then
+        if not hudUnavailableLogged then
+            print("[DynamicHUD] Error: No target HUD elements could be updated.")
+            hudUnavailableLogged = true
+        end
+        return false
+    end
+
+    hudUnavailableLogged = false
     print(string.format("[DynamicHUD] HUD Opacity set to %.1f (%d/%d elements updated)",
         targetOpacity, successCount, #TARGET_HUD_PROPERTIES))
+    return true
 end
 
-RegisterKeyBind(Key.F8, function()
-    isHudVisible = not isHudVisible
-    SetGameplayHUDVisibility(isHudVisible)
-end)
-
-print("[DynamicHUD] Specific target whitelist active!")
-
-
 -- Distance threshold in Unreal Units (100 units = 1 meter)
-local DETECTION_RADIUS = 1500.0
+local DETECTION_RADIUS = 500
 local MONSTER_CLASS_MARKER = "NPC_Monster"
+local SCAN_INTERVAL_MS = 1000
 
--- Return both the player position and pawn so the diagnostic can exclude the player.
 local function GetPlayerLocation()
     local pc = GetMyPlayerController()
 
@@ -116,23 +123,19 @@ local function GetPlayerLocation()
     return nil
 end
 
-RegisterKeyBind(Key.F2, function()
+local function GetNearbyMonsterNames()
     local playerLoc, localPawn = GetPlayerLocation()
     if not playerLoc then
-        print("[DynamicHUD] Player location unavailable.")
-        return
+        return nil
     end
 
-    print("--- [DynamicHUD] NEARBY MONSTER DIAGNOSTIC ---")
-    local count = 0
-
-    -- Query broad actor base classes in memory
     local candidates = FindAllOf("Character")
     if not candidates or #candidates == 0 then
         candidates = FindAllOf("Pawn")
     end
     candidates = candidates or {}
 
+    local nearbyMonsterNames = {}
     for _, actor in ipairs(candidates) do
         if actor and actor:IsValid() and actor ~= localPawn then
             local fullName = nil
@@ -149,16 +152,76 @@ RegisterKeyBind(Key.F2, function()
                     local dist = math.sqrt(dx * dx + dy * dy + dz * dz)
 
                     if dist <= DETECTION_RADIUS then
-                        count = count + 1
-                        print(string.format("     Path: %s", fullName))
+                        table.insert(nearbyMonsterNames, fullName)
                     end
                 end
             end
         end
     end
 
-    if count == 0 then
+    return nearbyMonsterNames
+end
+
+local function ApplyHUDVisibility(visible)
+    if isHudVisible == visible then
+        return
+    end
+
+    if SetGameplayHUDVisibility(visible) then
+        isHudVisible = visible
+    end
+end
+
+RegisterKeyBind(Key.F8, function()
+    if visibilityMode == "auto" then
+        visibilityMode = "manual_hidden"
+        print("[DynamicHUD] Manual override: HUD hidden. Press F8 to show it.")
+    elseif visibilityMode == "manual_hidden" then
+        visibilityMode = "manual_visible"
+        print("[DynamicHUD] Manual override: HUD visible. Press F8 to resume automatic mode.")
+    else
+        visibilityMode = "auto"
+        print("[DynamicHUD] Automatic HUD visibility resumed.")
+    end
+
+    if visibilityMode == "manual_hidden" then
+        ApplyHUDVisibility(false)
+    elseif visibilityMode == "manual_visible" then
+        ApplyHUDVisibility(true)
+    end
+end)
+
+RegisterKeyBind(Key.F2, function()
+    local nearbyMonsterNames = GetNearbyMonsterNames()
+    if not nearbyMonsterNames then
+        print("[DynamicHUD] Player location unavailable.")
+        return
+    end
+
+    print("--- [DynamicHUD] NEARBY MONSTER DIAGNOSTIC ---")
+    for _, fullName in ipairs(nearbyMonsterNames) do
+        print(string.format("     Path: %s", fullName))
+    end
+
+    if #nearbyMonsterNames == 0 then
         print("[DynamicHUD] No nearby monsters found within " .. DETECTION_RADIUS / 100.0 .. "m.")
     end
     print("--------------------------------------------")
 end)
+
+LoopAsync(SCAN_INTERVAL_MS, function()
+    local nearbyMonsterNames = GetNearbyMonsterNames()
+    if not nearbyMonsterNames then
+        return
+    end
+
+    if visibilityMode == "auto" then
+        ApplyHUDVisibility(#nearbyMonsterNames > 0)
+    elseif visibilityMode == "manual_hidden" then
+        ApplyHUDVisibility(false)
+    else
+        ApplyHUDVisibility(true)
+    end
+end)
+
+print("[DynamicHUD] Automatic monster detection active (scan every " .. SCAN_INTERVAL_MS / 1000 .. "s).")
