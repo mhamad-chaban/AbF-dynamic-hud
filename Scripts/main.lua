@@ -1,40 +1,13 @@
 -- Mods/DynamicHUD/scripts/main.lua
 
 local AFUtils = require("AFUtils.AFUtils")
+local Constants = require("Constants")
+local TARGET_HUD_PROPERTIES = require("HUDProperties")
 
 local Key = Key
 local hudOpacity = nil
 local visibilityMode = "auto"
 local hudUnavailableLogged = false
-
--- Master list of elements to toggle opacity on
-local TARGET_HUD_PROPERTIES = {
-    "HealthBar",
-    "W_PlayerHUD_Hotbar",
-    "W_PlayerHUD_BodyDiagram",
-    "W_HUD_AmmoCounter",
-    "Hbox_Gadgets",
-    "HealthHeartIcon",
-    "Icon_Inventory",
-    "Icon_RadialWheel_Gestures",
-    "Icon_RadialWheel_Health",
-    "icon_watch",
-    "Journal_Icon",
-    "JournalPrompt",
-    "Keybind_Backpack",
-    "Keybind_Emote",
-    "Keybind_HealthPanel",
-    "Keybind_Shield",
-    "Keybind_Watch",
-    "SitIcon",
-    "PagerIcon",
-    "DEBUG_NavMesh",
-    "W_HUD_QuestObjective",
-    "W_HUD_BuffBar",
-    "W_HUD_TemperatureBar",
-    "W_HUD_GadgetBar_ActiveFlashlight",
-    "W_SkillXPGain"
-}
 
 local function GetMainHUDWidget()
     local widgets = FindAllOf("UserWidget") or {}
@@ -106,14 +79,6 @@ local function SetGameplayHUDOpacity(opacity)
     return true
 end
 
--- Distance threshold in Unreal Units (100 units = 1 meter)
-local DETECTION_RADIUS = 500
-local MONSTER_CLASS_MARKER = "NPC_Monster"
-local SCAN_INTERVAL_MS = 1000
-local HUD_UPDATE_INTERVAL_MS = 100
-local VISIBLE_GRACE_PERIOD_MS = 10000
-local FADE_OUT_DURATION_MS = 2000
-
 local function GetPlayerLocation()
     local pc = GetMyPlayerController()
 
@@ -142,7 +107,7 @@ local function GetNearbyMonsterNames()
             local fullName = nil
             pcall(function() fullName = actor:GetFullName() end)
 
-            if fullName and string.find(fullName, MONSTER_CLASS_MARKER, 1, true) then
+            if fullName and string.find(fullName, Constants.MONSTER_CLASS_MARKER, 1, true) then
                 local loc = nil
                 pcall(function() loc = actor:K2_GetActorLocation() end)
 
@@ -152,7 +117,7 @@ local function GetNearbyMonsterNames()
                     local dz = playerLoc.Z - loc.Z
                     local dist = math.sqrt(dx * dx + dy * dy + dz * dz)
 
-                    if dist <= DETECTION_RADIUS then
+                    if dist <= Constants.DETECTION_RADIUS then
                         table.insert(nearbyMonsterNames, fullName)
                     end
                 end
@@ -206,7 +171,7 @@ RegisterKeyBind(Key.F2, function()
     end
 
     if #nearbyMonsterNames == 0 then
-        print("[DynamicHUD] No nearby monsters found within " .. DETECTION_RADIUS / 100.0 .. "m.")
+        print("[DynamicHUD] No nearby monsters found within " .. Constants.DETECTION_RADIUS / 100.0 .. "m.")
     end
     print("--------------------------------------------")
 end)
@@ -215,10 +180,10 @@ local elapsedMs = 0
 local lastMonsterSeenMs = nil
 local nearbyMonsters = false
 
-LoopAsync(HUD_UPDATE_INTERVAL_MS, function()
-    elapsedMs = elapsedMs + HUD_UPDATE_INTERVAL_MS
+LoopAsync(Constants.HUD_UPDATE_INTERVAL_MS, function()
+    elapsedMs = elapsedMs + Constants.HUD_UPDATE_INTERVAL_MS
 
-    if elapsedMs % SCAN_INTERVAL_MS == 0 then
+    if elapsedMs % Constants.SCAN_INTERVAL_MS == 0 then
         local nearbyMonsterNames = GetNearbyMonsterNames()
         if nearbyMonsterNames then
             nearbyMonsters = #nearbyMonsterNames > 0
@@ -238,10 +203,11 @@ LoopAsync(HUD_UPDATE_INTERVAL_MS, function()
         ApplyHUDOpacity(1)
     elseif lastMonsterSeenMs then
         local timeSinceLastMonsterMs = elapsedMs - lastMonsterSeenMs
-        if timeSinceLastMonsterMs <= VISIBLE_GRACE_PERIOD_MS then
+        if timeSinceLastMonsterMs <= Constants.VISIBLE_GRACE_PERIOD_MS then
             ApplyHUDOpacity(1)
         else
-            local fadeProgress = (timeSinceLastMonsterMs - VISIBLE_GRACE_PERIOD_MS) / FADE_OUT_DURATION_MS
+            local fadeProgress = (timeSinceLastMonsterMs - Constants.VISIBLE_GRACE_PERIOD_MS)
+                / Constants.FADE_OUT_DURATION_MS
             ApplyHUDOpacity(1 - fadeProgress)
         end
     else
@@ -251,7 +217,7 @@ end)
 
 print(string.format(
     "[DynamicHUD] Automatic monster detection active (scan every %ds, %ds visible grace, %ds fade-out).",
-    SCAN_INTERVAL_MS / 1000,
-    VISIBLE_GRACE_PERIOD_MS / 1000,
-    FADE_OUT_DURATION_MS / 1000
+    Constants.SCAN_INTERVAL_MS / 1000,
+    Constants.VISIBLE_GRACE_PERIOD_MS / 1000,
+    Constants.FADE_OUT_DURATION_MS / 1000
 ))
