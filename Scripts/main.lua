@@ -3,7 +3,7 @@
 local AFUtils = require("AFUtils.AFUtils")
 
 local Key = Key
-local isHudVisible = nil
+local hudOpacity = nil
 local visibilityMode = "auto"
 local hudUnavailableLogged = false
 
@@ -32,7 +32,8 @@ local TARGET_HUD_PROPERTIES = {
     "W_HUD_QuestObjective",
     "W_HUD_BuffBar",
     "W_HUD_TemperatureBar",
-    "W_HUD_GadgetBar_ActiveFlashlight"
+    "W_HUD_GadgetBar_ActiveFlashlight",
+    "W_SkillXPGain"
 }
 
 local function GetMainHUDWidget()
@@ -69,7 +70,7 @@ local function GetWidgetProperty(parent, propName)
     return nil
 end
 
-local function SetGameplayHUDVisibility(visible)
+local function SetGameplayHUDOpacity(opacity)
     local mainHUD = GetMainHUDWidget()
     if not mainHUD or not mainHUD:IsValid() then
         if not hudUnavailableLogged then
@@ -79,14 +80,13 @@ local function SetGameplayHUDVisibility(visible)
         return false
     end
 
-    local targetOpacity = visible and 1.0 or 0.0
     local successCount = 0
 
     for _, propName in ipairs(TARGET_HUD_PROPERTIES) do
         local element = GetWidgetProperty(mainHUD, propName)
         if element then
             local success = pcall(function()
-                element:SetRenderOpacity(targetOpacity)
+                element:SetRenderOpacity(opacity)
             end)
             if success then
                 successCount = successCount + 1
@@ -103,8 +103,6 @@ local function SetGameplayHUDVisibility(visible)
     end
 
     hudUnavailableLogged = false
-    print(string.format("[DynamicHUD] HUD Opacity set to %.1f (%d/%d elements updated)",
-        targetOpacity, successCount, #TARGET_HUD_PROPERTIES))
     return true
 end
 
@@ -112,6 +110,9 @@ end
 local DETECTION_RADIUS = 500
 local MONSTER_CLASS_MARKER = "NPC_Monster"
 local SCAN_INTERVAL_MS = 1000
+local HUD_UPDATE_INTERVAL_MS = 100
+local VISIBLE_GRACE_PERIOD_MS = 10000
+local FADE_OUT_DURATION_MS = 2000
 
 local function GetPlayerLocation()
     local pc = GetMyPlayerController()
@@ -162,13 +163,14 @@ local function GetNearbyMonsterNames()
     return nearbyMonsterNames
 end
 
-local function ApplyHUDVisibility(visible)
-    if isHudVisible == visible then
+local function ApplyHUDOpacity(opacity)
+    opacity = math.max(0, math.min(1, opacity))
+    if hudOpacity and math.abs(hudOpacity - opacity) < 0.001 then
         return
     end
 
-    if SetGameplayHUDVisibility(visible) then
-        isHudVisible = visible
+    if SetGameplayHUDOpacity(opacity) then
+        hudOpacity = opacity
     end
 end
 
@@ -185,9 +187,9 @@ RegisterKeyBind(Key.F8, function()
     end
 
     if visibilityMode == "manual_hidden" then
-        ApplyHUDVisibility(false)
+        ApplyHUDOpacity(0)
     elseif visibilityMode == "manual_visible" then
-        ApplyHUDVisibility(true)
+        ApplyHUDOpacity(1)
     end
 end)
 
@@ -209,19 +211,47 @@ RegisterKeyBind(Key.F2, function()
     print("--------------------------------------------")
 end)
 
-LoopAsync(SCAN_INTERVAL_MS, function()
-    local nearbyMonsterNames = GetNearbyMonsterNames()
-    if not nearbyMonsterNames then
-        return
+local elapsedMs = 0
+local lastMonsterSeenMs = nil
+local nearbyMonsters = false
+
+LoopAsync(HUD_UPDATE_INTERVAL_MS, function()
+    elapsedMs = elapsedMs + HUD_UPDATE_INTERVAL_MS
+
+    if elapsedMs % SCAN_INTERVAL_MS == 0 then
+        local nearbyMonsterNames = GetNearbyMonsterNames()
+        if nearbyMonsterNames then
+            nearbyMonsters = #nearbyMonsterNames > 0
+            if nearbyMonsters then
+                lastMonsterSeenMs = elapsedMs
+            end
+        else
+            nearbyMonsters = false
+        end
     end
 
-    if visibilityMode == "auto" then
-        ApplyHUDVisibility(#nearbyMonsterNames > 0)
-    elseif visibilityMode == "manual_hidden" then
-        ApplyHUDVisibility(false)
+    if visibilityMode == "manual_hidden" then
+        ApplyHUDOpacity(0)
+    elseif visibilityMode == "manual_visible" then
+        ApplyHUDOpacity(1)
+    elseif nearbyMonsters then
+        ApplyHUDOpacity(1)
+    elseif lastMonsterSeenMs then
+        local timeSinceLastMonsterMs = elapsedMs - lastMonsterSeenMs
+        if timeSinceLastMonsterMs <= VISIBLE_GRACE_PERIOD_MS then
+            ApplyHUDOpacity(1)
+        else
+            local fadeProgress = (timeSinceLastMonsterMs - VISIBLE_GRACE_PERIOD_MS) / FADE_OUT_DURATION_MS
+            ApplyHUDOpacity(1 - fadeProgress)
+        end
     else
-        ApplyHUDVisibility(true)
+        ApplyHUDOpacity(0)
     end
 end)
 
-print("[DynamicHUD] Automatic monster detection active (scan every " .. SCAN_INTERVAL_MS / 1000 .. "s).")
+print(string.format(
+    "[DynamicHUD] Automatic monster detection active (scan every %ds, %ds visible grace, %ds fade-out).",
+    SCAN_INTERVAL_MS / 1000,
+    VISIBLE_GRACE_PERIOD_MS / 1000,
+    FADE_OUT_DURATION_MS / 1000
+))
