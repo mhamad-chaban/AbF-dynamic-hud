@@ -1,0 +1,12 @@
+{
+  "Lua.diagnostics.globals": [
+    "RegisterKeyBind",
+    "GetPlayerController",
+    "LoopAsync",
+    "FindAllOf",
+    "Key"
+  ],
+  "Lua.workspace.library": [
+    "../shared/types"
+  ]
+}
