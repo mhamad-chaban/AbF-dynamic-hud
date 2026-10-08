@@ -1,6 +1,6 @@
 return {
     -- Distance in Unreal units (100 units = 1 meter).
-    DETECTION_RADIUS = 500,
+    DETECTION_RADIUS = 1000,
     MONSTER_CLASS_MARKER = "NPC_Monster",
     SCAN_INTERVAL_MS = 1000,
     HUD_UPDATE_INTERVAL_MS = 100,
