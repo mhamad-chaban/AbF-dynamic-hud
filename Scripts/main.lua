@@ -128,6 +128,87 @@ local function GetNearbyMonsterNames()
     return nearbyMonsterNames
 end
 
+local VITAL_FIELD_CANDIDATES = {
+    "CurrentHealth_Head",
+    "CurrentHealth_Torso",
+    "CurrentHealth_LeftArm",
+    "CurrentHealth_RightArm",
+    "CurrentHealth_LeftLeg",
+    "CurrentHealth_RightLeg",
+    "Stamina",
+    "CurrentStamina",
+    "MaxStamina",
+    "StaminaCurrent",
+    "StaminaMax"
+}
+
+local function PrintVitalFields(label, object)
+    if not object or not object:IsValid() then
+        print(string.format("[DynamicHUD] %s unavailable.", label))
+        return
+    end
+
+    local fullName = "unknown object"
+    pcall(function() fullName = object:GetFullName() end)
+    print(string.format("[DynamicHUD] %s: %s", label, fullName))
+    local foundField = false
+
+    for _, fieldName in ipairs(VITAL_FIELD_CANDIDATES) do
+        local value = nil
+        local success = pcall(function()
+            value = object[fieldName]
+        end)
+
+        if success and (type(value) == "number" or type(value) == "string" or type(value) == "boolean") then
+            foundField = true
+            print(string.format("     %s = %s", fieldName, tostring(value)))
+        end
+    end
+
+    if not foundField then
+        print("     No matching direct health/stamina fields found.")
+    end
+end
+
+local function PrintHUDHealthPercentage(hud)
+    if not hud or not hud:IsValid() then
+        print("[DynamicHUD] HUD health percentage unavailable.")
+        return
+    end
+
+    local percentage = nil
+    local success = pcall(function()
+        percentage = hud.LastHealthPercentage
+    end)
+
+    if success and type(percentage) == "number" then
+        print(string.format("[DynamicHUD] HUD LastHealthPercentage = %.4f", percentage))
+    else
+        print("[DynamicHUD] Could not read HUD LastHealthPercentage.")
+    end
+end
+
+RegisterKeyBind(Key.F3, function()
+    local pc = GetMyPlayerController()
+    if not pc or not pc:IsValid() or not pc.Pawn or not pc.Pawn:IsValid() then
+        print("[DynamicHUD] Player character unavailable for vitals diagnostic.")
+        return
+    end
+
+    local playerPawn = pc.Pawn
+    local mainHUD = GetMainHUDWidget()
+    local hudCharacter = GetWidgetProperty(mainHUD, "OwningCharacter")
+
+    print("--- [DynamicHUD] PLAYER VITALS DIAGNOSTIC ---")
+    PrintVitalFields("Player pawn", playerPawn)
+    if hudCharacter ~= playerPawn then
+        PrintVitalFields("HUD owning character", hudCharacter)
+    end
+
+    PrintHUDHealthPercentage(mainHUD)
+    print("--------------------------------------------")
+end)
+
 local function ApplyHUDOpacity(opacity)
     opacity = math.max(0, math.min(1, opacity))
     if hudOpacity and math.abs(hudOpacity - opacity) < 0.001 then
