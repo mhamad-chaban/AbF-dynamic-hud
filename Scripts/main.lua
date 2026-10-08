@@ -7,7 +7,6 @@ local isHudVisible = true
 
 -- Master list of elements to toggle opacity on
 local TARGET_HUD_PROPERTIES = {
-    -- Always-visible HUD elements & icons
     "HealthBar",
     "W_PlayerHUD_Hotbar",
     "W_PlayerHUD_BodyDiagram",
@@ -29,8 +28,6 @@ local TARGET_HUD_PROPERTIES = {
     "PagerIcon",
     "DEBUG_NavMesh",
     "W_HUD_QuestObjective",
-
-    -- Dynamic auto-hide widgets
     "W_HUD_BuffBar",
     "W_HUD_TemperatureBar",
     "W_HUD_GadgetBar_ActiveFlashlight"
@@ -96,7 +93,6 @@ local function SetGameplayHUDVisibility(visible)
         targetOpacity, successCount, #TARGET_HUD_PROPERTIES))
 end
 
--- Keybind Toggle (F8)
 RegisterKeyBind(Key.F8, function()
     isHudVisible = not isHudVisible
     SetGameplayHUDVisibility(isHudVisible)
@@ -105,16 +101,17 @@ end)
 print("[DynamicHUD] Specific target whitelist active!")
 
 
-
 -- Distance threshold in Unreal Units (100 units = 1 meter)
 local DETECTION_RADIUS = 1500.0
+local MONSTER_CLASS_MARKER = "NPC_Monster"
 
--- Helper to get player position vector
+-- Return both the player position and pawn so the diagnostic can exclude the player.
 local function GetPlayerLocation()
     local pc = GetMyPlayerController()
 
     if pc and pc:IsValid() and pc.Pawn and pc.Pawn:IsValid() then
-        return pc.Pawn:K2_GetActorLocation()
+        local pawn = pc.Pawn
+        return pawn:K2_GetActorLocation(), pawn
     end
     return nil
 end
@@ -126,38 +123,42 @@ RegisterKeyBind(Key.F2, function()
         return
     end
 
-    print("--- [DynamicHUD] NEARBY ACTOR DIAGNOSTIC ---")
+    print("--- [DynamicHUD] NEARBY MONSTER DIAGNOSTIC ---")
     local count = 0
 
     -- Query broad actor base classes in memory
-    local candidates = FindAllOf("Character") or FindAllOf("Pawn") or {}
+    local candidates = FindAllOf("Character")
+    if not candidates or #candidates == 0 then
+        candidates = FindAllOf("Pawn")
+    end
+    candidates = candidates or {}
 
     for _, actor in ipairs(candidates) do
         if actor and actor:IsValid() and actor ~= localPawn then
-            local loc = nil
-            pcall(function() loc = actor:K2_GetActorLocation() end)
+            local fullName = nil
+            pcall(function() fullName = actor:GetFullName() end)
 
-            if loc then
-                local dx = playerLoc.X - loc.X
-                local dy = playerLoc.Y - loc.Y
-                local dz = playerLoc.Z - loc.Z
-                local dist = math.sqrt(dx * dx + dy * dy + dz * dz)
+            if fullName and string.find(fullName, MONSTER_CLASS_MARKER, 1, true) then
+                local loc = nil
+                pcall(function() loc = actor:K2_GetActorLocation() end)
 
-                -- 3000 units = 30 meters
-                if dist <= 1500.0 then
-                    count = count + 1
-                    local fullName = actor:GetFullName() or "Unknown"
-                    local meters = dist / 100.0
+                if loc then
+                    local dx = playerLoc.X - loc.X
+                    local dy = playerLoc.Y - loc.Y
+                    local dz = playerLoc.Z - loc.Z
+                    local dist = math.sqrt(dx * dx + dy * dy + dz * dz)
 
-
-                    print(string.format("     Path: %s", fullName))
+                    if dist <= DETECTION_RADIUS then
+                        count = count + 1
+                        print(string.format("     Path: %s", fullName))
+                    end
                 end
             end
         end
     end
 
     if count == 0 then
-        print("[DynamicHUD] No nearby Pawns/Characters found within 30m.")
+        print("[DynamicHUD] No nearby monsters found within " .. DETECTION_RADIUS / 100.0 .. "m.")
     end
     print("--------------------------------------------")
 end)
