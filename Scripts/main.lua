@@ -5,9 +5,13 @@ local Constants = require("Constants")
 local TARGET_HUD_PROPERTIES = require("HUDProperties")
 
 local Key = Key
-local hudOpacity = nil
+local lastAppliedState = nil
 local visibilityMode = "auto"
 local hudUnavailableLogged = false
+local playerHealthPercent = nil
+local playerStaminaPercent = nil
+local HEALTH_HUD_PROPERTIES = { "HealthBar", "W_PlayerHUD_BodyDiagram" }
+local STAMINA_HUD_PROPERTIES = { "StaminaBar", "StaminaExertionBar" }
 
 local function GetMainHUDWidget()
     local widgets = FindAllOf("UserWidget") or {}
@@ -43,7 +47,18 @@ local function GetWidgetProperty(parent, propName)
     return nil
 end
 
-local function SetGameplayHUDOpacity(opacity)
+local function SetHUDElementOpacity(mainHUD, propertyName, opacity)
+    local element = GetWidgetProperty(mainHUD, propertyName)
+    if not element then
+        return false
+    end
+
+    return pcall(function()
+        element:SetRenderOpacity(opacity)
+    end)
+end
+
+local function SetGameplayHUDState(opacity, healthLow, staminaLow)
     local mainHUD = GetMainHUDWidget()
     if not mainHUD or not mainHUD:IsValid() then
         if not hudUnavailableLogged then
@@ -53,17 +68,25 @@ local function SetGameplayHUDOpacity(opacity)
         return false
     end
 
+    local healthOpacity = healthLow and 1 or opacity
+    local staminaOpacity = staminaLow and 1 or opacity
     local successCount = 0
 
     for _, propName in ipairs(TARGET_HUD_PROPERTIES) do
-        local element = GetWidgetProperty(mainHUD, propName)
-        if element then
-            local success = pcall(function()
-                element:SetRenderOpacity(opacity)
-            end)
-            if success then
-                successCount = successCount + 1
-            end
+        if SetHUDElementOpacity(mainHUD, propName, opacity) then
+            successCount = successCount + 1
+        end
+    end
+
+    for _, propName in ipairs(HEALTH_HUD_PROPERTIES) do
+        if SetHUDElementOpacity(mainHUD, propName, healthOpacity) then
+            successCount = successCount + 1
+        end
+    end
+
+    for _, propName in ipairs(STAMINA_HUD_PROPERTIES) do
+        if SetHUDElementOpacity(mainHUD, propName, staminaOpacity) then
+            successCount = successCount + 1
         end
     end
 
@@ -79,6 +102,27 @@ local function SetGameplayHUDOpacity(opacity)
     return true
 end
 
+local function ApplyHUDState(opacity, healthLow, staminaLow)
+    opacity = math.max(0, math.min(1, opacity))
+    local healthOpacity = healthLow and 1 or opacity
+    local staminaOpacity = staminaLow and 1 or opacity
+
+    if lastAppliedState
+        and math.abs(lastAppliedState.opacity - opacity) < 0.001
+        and math.abs(lastAppliedState.healthOpacity - healthOpacity) < 0.001
+        and math.abs(lastAppliedState.staminaOpacity - staminaOpacity) < 0.001 then
+        return
+    end
+
+    if SetGameplayHUDState(opacity, healthLow, staminaLow) then
+        lastAppliedState = {
+            opacity = opacity,
+            healthOpacity = healthOpacity,
+            staminaOpacity = staminaOpacity
+        }
+    end
+end
+
 local function GetPlayerLocation()
     local pc = GetMyPlayerController()
 
@@ -87,6 +131,43 @@ local function GetPlayerLocation()
         return pawn:K2_GetActorLocation(), pawn
     end
     return nil
+end
+
+local function ReadNumberProperty(object, propertyName)
+    local value = nil
+    local success = pcall(function()
+        value = object[propertyName]
+    end)
+
+    if success and type(value) == "number" and value == value then
+        return value
+    end
+    return nil
+end
+
+local function GetPlayerVitalPercentages()
+    local pc = GetMyPlayerController()
+    if not pc or not pc:IsValid() or not pc.Pawn or not pc.Pawn:IsValid() then
+        return nil, nil
+    end
+
+    local healthPercent = nil
+    local mainHUD = GetMainHUDWidget()
+    if mainHUD and mainHUD:IsValid() then
+        healthPercent = ReadNumberProperty(mainHUD, "LastHealthPercentage")
+    end
+
+    local staminaPercent = nil
+    local currentStamina = ReadNumberProperty(pc.Pawn, "CurrentStamina")
+    local maxStamina = ReadNumberProperty(pc.Pawn, "MaxStamina")
+    if currentStamina and maxStamina and maxStamina > 0 then
+        staminaPercent = math.max(0, math.min(1, currentStamina / maxStamina))
+    end
+
+    if healthPercent then
+        healthPercent = math.max(0, math.min(1, healthPercent))
+    end
+    return healthPercent, staminaPercent
 end
 
 local function GetNearbyMonsterNames()
@@ -128,20 +209,6 @@ local function GetNearbyMonsterNames()
     return nearbyMonsterNames
 end
 
-local VITAL_FIELD_CANDIDATES = {
-    "CurrentHealth_Head",
-    "CurrentHealth_Torso",
-    "CurrentHealth_LeftArm",
-    "CurrentHealth_RightArm",
-    "CurrentHealth_LeftLeg",
-    "CurrentHealth_RightLeg",
-    "Stamina",
-    "CurrentStamina",
-    "MaxStamina",
-    "StaminaCurrent",
-    "StaminaMax"
-}
-
 local function PrintVitalFields(label, object)
     if not object or not object:IsValid() then
         print(string.format("[DynamicHUD] %s unavailable.", label))
@@ -153,7 +220,7 @@ local function PrintVitalFields(label, object)
     print(string.format("[DynamicHUD] %s: %s", label, fullName))
     local foundField = false
 
-    for _, fieldName in ipairs(VITAL_FIELD_CANDIDATES) do
+    for _, fieldName in ipairs(Constants.VITAL_FIELD_CANDIDATES) do
         local value = nil
         local success = pcall(function()
             value = object[fieldName]
@@ -198,27 +265,24 @@ RegisterKeyBind(Key.F3, function()
     local playerPawn = pc.Pawn
     local mainHUD = GetMainHUDWidget()
     local hudCharacter = GetWidgetProperty(mainHUD, "OwningCharacter")
+    local playerPawnName = nil
+    local hudCharacterName = nil
+    pcall(function() playerPawnName = playerPawn:GetFullName() end)
+    pcall(function()
+        if hudCharacter then
+            hudCharacterName = hudCharacter:GetFullName()
+        end
+    end)
 
     print("--- [DynamicHUD] PLAYER VITALS DIAGNOSTIC ---")
     PrintVitalFields("Player pawn", playerPawn)
-    if hudCharacter ~= playerPawn then
+    if hudCharacter and hudCharacterName ~= playerPawnName then
         PrintVitalFields("HUD owning character", hudCharacter)
     end
 
     PrintHUDHealthPercentage(mainHUD)
     print("--------------------------------------------")
 end)
-
-local function ApplyHUDOpacity(opacity)
-    opacity = math.max(0, math.min(1, opacity))
-    if hudOpacity and math.abs(hudOpacity - opacity) < 0.001 then
-        return
-    end
-
-    if SetGameplayHUDOpacity(opacity) then
-        hudOpacity = opacity
-    end
-end
 
 RegisterKeyBind(Key.F8, function()
     if visibilityMode == "auto" then
@@ -233,9 +297,9 @@ RegisterKeyBind(Key.F8, function()
     end
 
     if visibilityMode == "manual_hidden" then
-        ApplyHUDOpacity(0)
+        ApplyHUDState(0, false, false)
     elseif visibilityMode == "manual_visible" then
-        ApplyHUDOpacity(1)
+        ApplyHUDState(1, true, true)
     end
 end)
 
@@ -274,25 +338,34 @@ LoopAsync(Constants.HUD_UPDATE_INTERVAL_MS, function()
         else
             nearbyMonsters = false
         end
+
+        playerHealthPercent, playerStaminaPercent = GetPlayerVitalPercentages()
     end
 
     if visibilityMode == "manual_hidden" then
-        ApplyHUDOpacity(0)
+        ApplyHUDState(0, false, false)
     elseif visibilityMode == "manual_visible" then
-        ApplyHUDOpacity(1)
-    elseif nearbyMonsters then
-        ApplyHUDOpacity(1)
-    elseif lastMonsterSeenMs then
-        local timeSinceLastMonsterMs = elapsedMs - lastMonsterSeenMs
-        if timeSinceLastMonsterMs <= Constants.VISIBLE_GRACE_PERIOD_MS then
-            ApplyHUDOpacity(1)
-        else
-            local fadeProgress = (timeSinceLastMonsterMs - Constants.VISIBLE_GRACE_PERIOD_MS)
-                / Constants.FADE_OUT_DURATION_MS
-            ApplyHUDOpacity(1 - fadeProgress)
-        end
+        ApplyHUDState(1, true, true)
     else
-        ApplyHUDOpacity(0)
+        local hudOpacity = 0
+        if nearbyMonsters then
+            hudOpacity = 1
+        elseif lastMonsterSeenMs then
+            local timeSinceLastMonsterMs = elapsedMs - lastMonsterSeenMs
+            if timeSinceLastMonsterMs <= Constants.VISIBLE_GRACE_PERIOD_MS then
+                hudOpacity = 1
+            else
+                local fadeProgress = (timeSinceLastMonsterMs - Constants.VISIBLE_GRACE_PERIOD_MS)
+                    / Constants.FADE_OUT_DURATION_MS
+                hudOpacity = 1 - fadeProgress
+            end
+        end
+
+        local healthLow = playerHealthPercent ~= nil
+            and playerHealthPercent <= Constants.HEALTH_SHOW_BELOW_PERCENT
+        local staminaLow = playerStaminaPercent ~= nil
+            and playerStaminaPercent <= Constants.STAMINA_HIDE_ABOVE_PERCENT
+        ApplyHUDState(hudOpacity, healthLow, staminaLow)
     end
 end)
 

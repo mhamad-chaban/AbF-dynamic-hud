@@ -1,7 +1,5 @@
 return {
-    "HealthBar",
     "W_PlayerHUD_Hotbar",
-    "W_PlayerHUD_BodyDiagram",
     "W_HUD_AmmoCounter",
     "Hbox_Gadgets",
     "HealthHeartIcon",
