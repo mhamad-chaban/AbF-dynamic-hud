@@ -168,6 +168,43 @@ local function GetPlayerVitalPercentages()
     return healthPercent, staminaPercent
 end
 
+local function GetHotbarSelectionKey()
+    local pc = GetMyPlayerController()
+    if not pc or not pc:IsValid() or not pc.Pawn or not pc.Pawn:IsValid() then
+        return nil
+    end
+
+    local selection = nil
+    local success = pcall(function()
+        selection = pc.Pawn.CurrentHotbarSlotSelected
+    end)
+    if not success or selection == nil then
+        return nil
+    end
+
+    local inventory = nil
+    local index = nil
+    success = pcall(function()
+        inventory = selection.Inventory_2_B69CD60741EFD551F09ED5AFF44B1E46
+        index = selection.Index_5_6BDC7B3944A5DE0B319F9FA20720872F
+    end)
+    if not success or index == nil then
+        return nil
+    end
+
+    local inventoryName = "no-inventory"
+    if inventory then
+        local gotFullName = pcall(function()
+            inventoryName = inventory:GetFullName()
+        end)
+        if not gotFullName then
+            inventoryName = tostring(inventory)
+        end
+    end
+
+    return tostring(inventoryName) .. ":" .. tostring(index)
+end
+
 local function GetNearbyMonsterNames()
     local playerLoc, localPawn = GetPlayerLocation()
     if not playerLoc then
@@ -323,11 +360,23 @@ end)
 
 local elapsedMs = 0
 local lastMonsterSeenMs = nil
+local lastHotbarChangeMs = nil
+local previousHotbarSelection = nil
 local nearbyMonsters = false
 local hudOpacity = 0
 
 LoopAsync(Constants.HUD_UPDATE_INTERVAL_MS, function()
     elapsedMs = elapsedMs + Constants.HUD_UPDATE_INTERVAL_MS
+
+    local hotbarSelection = GetHotbarSelectionKey()
+    if hotbarSelection then
+        if previousHotbarSelection and hotbarSelection ~= previousHotbarSelection then
+            lastHotbarChangeMs = elapsedMs
+        end
+        previousHotbarSelection = hotbarSelection
+    else
+        previousHotbarSelection = nil
+    end
 
     if elapsedMs % Constants.SCAN_INTERVAL_MS == 0 then
         local nearbyMonsterNames = GetNearbyMonsterNames()
@@ -349,11 +398,16 @@ LoopAsync(Constants.HUD_UPDATE_INTERVAL_MS, function()
         ApplyHUDState(1, true, true)
     else
         local targetOpacity = 0
+        local lastActivityMs = lastMonsterSeenMs
+        if lastHotbarChangeMs and (not lastActivityMs or lastHotbarChangeMs > lastActivityMs) then
+            lastActivityMs = lastHotbarChangeMs
+        end
+
         if nearbyMonsters then
             targetOpacity = 1
-        elseif lastMonsterSeenMs then
-            local timeSinceLastMonsterMs = elapsedMs - lastMonsterSeenMs
-            if timeSinceLastMonsterMs <= Constants.VISIBLE_GRACE_PERIOD_MS then
+        elseif lastActivityMs then
+            local timeSinceLastActivityMs = elapsedMs - lastActivityMs
+            if timeSinceLastActivityMs <= Constants.VISIBLE_GRACE_PERIOD_MS then
                 targetOpacity = 1
             end
         end
