@@ -1,4 +1,4 @@
-local Constants = require("DHUD.Constants")
+local Constants = require("Scripts.DHUD.Config")
 
 local Player = {}
 

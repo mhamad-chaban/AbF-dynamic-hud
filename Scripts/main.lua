@@ -1,7 +1,7 @@
 require("AFUtils.AFUtils")
 
 local Key = Key
-local Constants = require("DHUD.Constants")
+local Constants = require("Scripts.DHUD.Config")
 local HUD = require("DHUD.HUD")
 local Player = require("DHUD.Player")
 local Enemies = require("DHUD.Enemies")

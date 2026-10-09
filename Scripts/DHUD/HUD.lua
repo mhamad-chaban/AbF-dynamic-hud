@@ -1,10 +1,11 @@
+local Constants = require("Scripts.DHUD.Config")
 local HUDProperties = require("DHUD.HUDProperties")
 
 local HUD = {}
 local unavailableLogged = false
 local lastAppliedState = nil
 
-local HEALTH_HUD_PROPERTIES = { "HealthBar", "W_PlayerHUD_BodyDiagram" }
+local HEALTH_HUD_PROPERTIES = { "HealthBar", "W_PlayerHUD_BodyDiagram", "HealthArrowVBox" }
 local STAMINA_HUD_PROPERTIES = { "StaminaBar", "StaminaExertionBar" }
 
 function HUD.GetMainWidget()
@@ -78,6 +79,14 @@ function HUD.ApplyState(opacity, healthLow, staminaLow)
         if SetElementOpacity(mainHUD, propertyName, opacity) then
             successCount = successCount + 1
         end
+    end
+    local hotbarOpacity = Constants.HIDE_HOTBAR and opacity or 1
+    if SetElementOpacity(mainHUD, "W_PlayerHUD_Hotbar", hotbarOpacity) then
+        successCount = successCount + 1
+    end
+    local waypointOpacity = Constants.HIDE_WAYPOINT_OVERLAY and opacity or 1
+    if SetElementOpacity(mainHUD, "W_WaypointOverlay", waypointOpacity) then
+        successCount = successCount + 1
     end
     for _, propertyName in ipairs(HEALTH_HUD_PROPERTIES) do
         if SetElementOpacity(mainHUD, propertyName, healthOpacity) then

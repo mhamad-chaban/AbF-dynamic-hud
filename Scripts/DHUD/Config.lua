@@ -9,6 +9,8 @@ return {
     FADE_OUT_DURATION_MS = 2000,
     STAMINA_HIDE_ABOVE_PERCENT = 0.5,
     HEALTH_SHOW_BELOW_PERCENT = 0.9,
+    HIDE_HOTBAR = true,
+    HIDE_WAYPOINT_OVERLAY = false,
     VITAL_FIELD_CANDIDATES = {
         "CurrentHealth_Head",
         "CurrentHealth_Torso",
