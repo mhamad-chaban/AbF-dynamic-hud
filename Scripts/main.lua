@@ -1,5 +1,3 @@
--- Mods/DynamicHUD/scripts/main.lua
-
 local AFUtils = require("AFUtils.AFUtils")
 local Constants = require("Constants")
 local TARGET_HUD_PROPERTIES = require("HUDProperties")
@@ -297,8 +295,10 @@ RegisterKeyBind(Key.F8, function()
     end
 
     if visibilityMode == "manual_hidden" then
+        hudOpacity = 0
         ApplyHUDState(0, false, false)
     elseif visibilityMode == "manual_visible" then
+        hudOpacity = 1
         ApplyHUDState(1, true, true)
     end
 end)
@@ -324,6 +324,7 @@ end)
 local elapsedMs = 0
 local lastMonsterSeenMs = nil
 local nearbyMonsters = false
+local hudOpacity = 0
 
 LoopAsync(Constants.HUD_UPDATE_INTERVAL_MS, function()
     elapsedMs = elapsedMs + Constants.HUD_UPDATE_INTERVAL_MS
@@ -347,18 +348,24 @@ LoopAsync(Constants.HUD_UPDATE_INTERVAL_MS, function()
     elseif visibilityMode == "manual_visible" then
         ApplyHUDState(1, true, true)
     else
-        local hudOpacity = 0
+        local targetOpacity = 0
         if nearbyMonsters then
-            hudOpacity = 1
+            targetOpacity = 1
         elseif lastMonsterSeenMs then
             local timeSinceLastMonsterMs = elapsedMs - lastMonsterSeenMs
             if timeSinceLastMonsterMs <= Constants.VISIBLE_GRACE_PERIOD_MS then
-                hudOpacity = 1
-            else
-                local fadeProgress = (timeSinceLastMonsterMs - Constants.VISIBLE_GRACE_PERIOD_MS)
-                    / Constants.FADE_OUT_DURATION_MS
-                hudOpacity = 1 - fadeProgress
+                targetOpacity = 1
             end
+        end
+
+        local fadeDurationMs = targetOpacity > hudOpacity
+            and Constants.FADE_IN_DURATION_MS
+            or Constants.FADE_OUT_DURATION_MS
+        local opacityStep = Constants.HUD_UPDATE_INTERVAL_MS / fadeDurationMs
+        if targetOpacity > hudOpacity then
+            hudOpacity = math.min(targetOpacity, hudOpacity + opacityStep)
+        elseif targetOpacity < hudOpacity then
+            hudOpacity = math.max(targetOpacity, hudOpacity - opacityStep)
         end
 
         local healthLow = playerHealthPercent ~= nil
@@ -370,8 +377,9 @@ LoopAsync(Constants.HUD_UPDATE_INTERVAL_MS, function()
 end)
 
 print(string.format(
-    "[DynamicHUD] Automatic monster detection active (scan every %ds, %ds visible grace, %ds fade-out).",
+    "[DynamicHUD] Automatic monster detection active (scan every %ds, %ds visible grace, %ds fade-in, %ds fade-out).",
     Constants.SCAN_INTERVAL_MS / 1000,
     Constants.VISIBLE_GRACE_PERIOD_MS / 1000,
+    Constants.FADE_IN_DURATION_MS / 1000,
     Constants.FADE_OUT_DURATION_MS / 1000
 ))
