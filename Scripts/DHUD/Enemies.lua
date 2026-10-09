@@ -1,4 +1,4 @@
-local Constants = require("Scripts.DHUD.Config")
+local Config = require("DHUD.Config")
 local Player = require("DHUD.Player")
 
 local Enemies = {}
@@ -20,7 +20,7 @@ function Enemies.GetNearbyMonsterNames()
         if actor and actor:IsValid() and actor ~= localPawn then
             local fullName = nil
             pcall(function() fullName = actor:GetFullName() end)
-            if fullName and string.find(fullName, Constants.MONSTER_CLASS_MARKER, 1, true) then
+            if fullName and string.find(fullName, Config.MONSTER_CLASS_MARKER, 1, true) then
                 local location = nil
                 pcall(function() location = actor:K2_GetActorLocation() end)
                 if location then
@@ -28,7 +28,7 @@ function Enemies.GetNearbyMonsterNames()
                     local dy = playerLocation.Y - location.Y
                     local dz = playerLocation.Z - location.Z
                     local distance = math.sqrt(dx * dx + dy * dy + dz * dz)
-                    if distance <= Constants.DETECTION_RADIUS then
+                    if distance <= Config.DETECTION_RADIUS then
                         table.insert(nearbyMonsterNames, fullName)
                     end
                 end

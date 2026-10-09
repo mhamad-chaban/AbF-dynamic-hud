@@ -1,4 +1,4 @@
-local Constants = require("Scripts.DHUD.Config")
+local Config = require("DHUD.Config")
 local HUDProperties = require("DHUD.HUDProperties")
 
 local HUD = {}
@@ -80,11 +80,11 @@ function HUD.ApplyState(opacity, healthLow, staminaLow)
             successCount = successCount + 1
         end
     end
-    local hotbarOpacity = Constants.HIDE_HOTBAR and opacity or 1
+    local hotbarOpacity = Config.HIDE_HOTBAR and opacity or 1
     if SetElementOpacity(mainHUD, "W_PlayerHUD_Hotbar", hotbarOpacity) then
         successCount = successCount + 1
     end
-    local waypointOpacity = Constants.HIDE_WAYPOINT_OVERLAY and opacity or 1
+    local waypointOpacity = Config.HIDE_WAYPOINT_OVERLAY and opacity or 1
     if SetElementOpacity(mainHUD, "W_WaypointOverlay", waypointOpacity) then
         successCount = successCount + 1
     end

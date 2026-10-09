@@ -1,4 +1,4 @@
-local Constants = require("Scripts.DHUD.Config")
+local Config = require("DHUD.Config")
 
 local Player = {}
 
@@ -102,7 +102,7 @@ function Player.PrintVitalFields(label, object)
     print(string.format("[DynamicHUD] %s: %s", label, fullName))
     local foundField = false
 
-    for _, fieldName in ipairs(Constants.VITAL_FIELD_CANDIDATES) do
+    for _, fieldName in ipairs(Config.VITAL_FIELD_CANDIDATES) do
         local value = nil
         local success = pcall(function()
             value = object[fieldName]

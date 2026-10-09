@@ -1,6 +1,6 @@
 local Diagnostics = {}
 
-function Diagnostics.Register(Key, Player, HUD, Enemies, Constants)
+function Diagnostics.Register(Key, Player, HUD, Enemies, Config)
     RegisterKeyBind(Key.F2, function()
         local nearbyMonsterNames = Enemies.GetNearbyMonsterNames()
         if not nearbyMonsterNames then
@@ -13,7 +13,7 @@ function Diagnostics.Register(Key, Player, HUD, Enemies, Constants)
             print(string.format("     Path: %s", fullName))
         end
         if #nearbyMonsterNames == 0 then
-            print("[DynamicHUD] No nearby monsters found within " .. Constants.DETECTION_RADIUS / 100.0 .. "m.")
+            print("[DynamicHUD] No nearby monsters found within " .. Config.DETECTION_RADIUS / 100.0 .. "m.")
         end
         print("--------------------------------------------")
     end)
