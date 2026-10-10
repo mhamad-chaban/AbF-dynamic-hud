@@ -21,5 +21,6 @@ return {
     "W_HUD_TemperatureBar",
     "W_HUD_GadgetBar_ActiveFlashlight",
     "W_SkillXPGain",
-    "W_PlayerHUD_ItemActionList"
+    "W_PlayerHUD_ItemActionList",
+    "W_InventoryWeight"
 }
