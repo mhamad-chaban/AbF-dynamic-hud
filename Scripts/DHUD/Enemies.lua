@@ -48,7 +48,7 @@ function Enemies.GetNearbyNPCNames()
 
     local nearbyEnemyNames = {}
     for _, candidate in ipairs(candidates) do
-        if IsEnemyNPC(candidate.fullName) and IsInCombat(candidate.actor) then
+        if IsEnemyNPC(candidate.fullName) and IsInCombat(candidate.actor) and not (candidate.actor.IsDead) then
             local location = nil
             pcall(function() location = candidate.actor:K2_GetActorLocation() end)
             if location then
