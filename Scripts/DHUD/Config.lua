@@ -1,7 +1,11 @@
 return {
     -- Distance in Unreal units (100 units = 1 meter).
     DETECTION_RADIUS = 1000,
-    MONSTER_CLASS_MARKER = "NPC_Monster",
+    NPC_ACTOR_PREFIX = "NPC_",
+    FRIENDLY_NPC_PREFIXES = {
+        "NarrativeNPC_",
+        "NPC_Boxy"
+    },
     SCAN_INTERVAL_MS = 1000,
     HUD_UPDATE_INTERVAL_MS = 300,
     VISIBLE_GRACE_PERIOD_MS = 10000,

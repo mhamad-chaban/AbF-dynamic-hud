@@ -3,10 +3,10 @@ local Visibility = {}
 function Visibility.Start(Key, Constants, HUD, Player, Enemies)
     local mode = "auto"
     local elapsedMs = 0
-    local lastMonsterSeenMs = nil
+    local lastEnemySeenMs = nil
     local lastHotbarChangeMs = nil
     local previousHotbarSelection = nil
-    local nearbyMonsters = false
+    local nearbyEnemies = false
     local hudOpacity = 0
     local playerHealthPercent = nil
     local playerStaminaPercent = nil
@@ -46,14 +46,14 @@ function Visibility.Start(Key, Constants, HUD, Player, Enemies)
         end
 
         if elapsedMs % Constants.SCAN_INTERVAL_MS == 0 then
-            local nearbyMonsterNames = Enemies.GetNearbyMonsterNames()
-            if nearbyMonsterNames then
-                nearbyMonsters = #nearbyMonsterNames > 0
-                if nearbyMonsters then
-                    lastMonsterSeenMs = elapsedMs
+            local nearbyEnemyNames = Enemies.GetNearbyNPCNames()
+            if nearbyEnemyNames then
+                nearbyEnemies = #nearbyEnemyNames > 0
+                if nearbyEnemies then
+                    lastEnemySeenMs = elapsedMs
                 end
             else
-                nearbyMonsters = false
+                nearbyEnemies = false
             end
             playerHealthPercent, playerStaminaPercent = Player.GetVitalPercentages(HUD)
         end
@@ -64,12 +64,12 @@ function Visibility.Start(Key, Constants, HUD, Player, Enemies)
             HUD.ApplyState(1, true, true)
         else
             local targetOpacity = 0
-            local lastActivityMs = lastMonsterSeenMs
+            local lastActivityMs = lastEnemySeenMs
             if lastHotbarChangeMs and (not lastActivityMs or lastHotbarChangeMs > lastActivityMs) then
                 lastActivityMs = lastHotbarChangeMs
             end
 
-            if nearbyMonsters then
+            if nearbyEnemies then
                 targetOpacity = 1
             elseif lastActivityMs then
                 local timeSinceLastActivityMs = elapsedMs - lastActivityMs
@@ -97,7 +97,7 @@ function Visibility.Start(Key, Constants, HUD, Player, Enemies)
     end)
 
     print(string.format(
-        "[DynamicHUD] Automatic monster detection active (scan every %ds, %ds visible grace, %ds fade-in, %ds fade-out).",
+        "[DynamicHUD] Automatic enemy NPC detection active (scan every %ds, %ds visible grace, %ds fade-in, %ds fade-out).",
         Constants.SCAN_INTERVAL_MS / 1000,
         Constants.VISIBLE_GRACE_PERIOD_MS / 1000,
         Constants.FADE_IN_DURATION_MS / 1000,
