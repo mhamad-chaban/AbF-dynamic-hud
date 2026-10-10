@@ -17,6 +17,14 @@ local function IsEnemyNPC(fullName)
     return true
 end
 
+local function IsInCombat(actor)
+    local combatState = nil
+    local success = pcall(function()
+        combatState = actor.CombatState
+    end)
+    return success and combatState == true
+end
+
 function Enemies.GetNearbyNPCNames()
     local playerLocation, localPawn = Player.GetLocation()
     if not playerLocation then
@@ -40,7 +48,7 @@ function Enemies.GetNearbyNPCNames()
 
     local nearbyEnemyNames = {}
     for _, candidate in ipairs(candidates) do
-        if IsEnemyNPC(candidate.fullName) then
+        if IsEnemyNPC(candidate.fullName) and IsInCombat(candidate.actor) then
             local location = nil
             pcall(function() location = candidate.actor:K2_GetActorLocation() end)
             if location then
