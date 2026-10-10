@@ -20,5 +20,6 @@ return {
     "W_HUD_BuffBar",
     "W_HUD_TemperatureBar",
     "W_HUD_GadgetBar_ActiveFlashlight",
-    "W_SkillXPGain"
+    "W_SkillXPGain",
+    "W_PlayerHUD_ItemActionList"
 }
